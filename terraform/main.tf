@@ -4,10 +4,11 @@ provider "google" {
 }
 
 resource "google_storage_bucket" "meu_bucket" {
-  name     = "bucket-iac-edu"
+  name     = "bucket-tfstate-iac-edu"
   location = "US"
 }
 
 resource "random_id" "sufixo" {
   byte_length = 4
 }
+
