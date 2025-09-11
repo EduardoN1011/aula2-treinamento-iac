@@ -1,0 +1,64 @@
+name: Destroy Infraestrutura
+
+on:
+  workflow_dispatch:
+    inputs:
+      bucket_name:
+        description: "Digite o nome do bucket"
+        required: true
+        default: "COLE AQUI O NOME DO SEU BUCKET"
+
+env:
+  TERRAFORM_VERSION: 1.7.5
+  WORKING_DIR: infra
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Autenticar com GCP
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Instalar Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+
+      - name: Inicializar Terraform
+        run: terraform init
+        working-directory: ${{ env.WORKING_DIR }}
+
+      - name: Validar Terraform
+        run: terraform validate
+        working-directory: ${{ env.WORKING_DIR }}
+
+      - name: Excluir index.html do bucket (se existir)
+        continue-on-error: true
+        run: |
+          echo "🧹 Limpando bucket antes da destruição..."
+          gsutil rm "gs://${{ github.event.inputs.bucket_name }}/index.html" || echo "Nenhum arquivo encontrado"
+
+      - name: Destruir infraestrutura
+        run: terraform destroy -auto-approve -var="project_id=${{ secrets.GCP_PROJECT_ID }}"
+        working-directory: ${{ env.WORKING_DIR }}
+
+      - name: Finalização
+        run: echo "🔥 Infraestrutura destruída com sucesso!"
+
+      - name: Enviar notificação para o Discord
+        if: success()
+        run: |
+          curl -H "Content-Type: application/json" \
+            -X POST \
+            -d "{\"content\": \"🔥 Infraestrutura destruída com sucesso!\"}" \
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
